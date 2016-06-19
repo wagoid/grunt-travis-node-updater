@@ -1,6 +1,6 @@
 {
   "name": "grunt-travis-node-updater",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Grunt task to update your Node.js target versions in .travis.yml",
   "main": "tasks/travisNodeUpdater.js",
   "scripts": {
@@ -11,6 +11,7 @@
     "url": "git+https://github.com/wagoid/grunt-travis-node-updater.git"
   },
   "keywords": [
+    "grunt",
     "travis",
     ".travis.yml",
     "version",

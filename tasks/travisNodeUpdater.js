@@ -23,7 +23,8 @@ module.exports = function (_grunt) {
 			version: LATEST_VERSION,
 			travisFilePath: TRAVIS_FILE_PATH,
 			nodeVersionsUrl: NODE_VERSIONS_URL,
-			replacePreviousVersions: false,
+			numberOfVersionsPerMajorNumber: 2,
+			replacePreviousVersions: false
 		});
 		options.done = done;
 
@@ -43,12 +44,9 @@ function executeTask(options) {
 			var travisConfiguration = results[0];
 			var nodeVersions = results[1];
 			var matchingVersions = getMatchingVersions(nodeVersions, options);
-			if (!travisConfiguration.node_js) {
-				throw new Error('Travis file have no property "node_js"!');
-			} else {
-				travisConfiguration.node_js = getNewNodeVersions(options, travisConfiguration.node_js, matchingVersions);
-				return writeFile(options.travisFilePath, yaml.stringify(travisConfiguration, 2), 'utf8').then(options.done);
-			}
+			
+			travisConfiguration.node_js = getNewNodeVersions(options, travisConfiguration.node_js || [], matchingVersions);
+			return writeFile(options.travisFilePath, yaml.stringify(travisConfiguration, 2), 'utf8').then(options.done);
 		})
 		.catch(function (e) {
 			grunt.fail.fatal('Error executing the travis updater task. Reason: ' + e, 3);
@@ -69,10 +67,8 @@ function getNodeAvailableVersions(options) {
 
 function getMatchingVersions(nodeVersions, options) {
 	var versionMatch = getVersionMatch(options.version, nodeVersions);
-	if (!options.matchingComparator) {
-		options.matchingComparator = defaultVersionMatchingFunction(versionMatch);
-	}
-	var matchingVersions = _.filter(nodeVersions, options.matchingComparator);
+	var matchingVersions = _.filter(nodeVersions, defaultVersionMatchingComparator(versionMatch));
+	filterMaximumNumberOfVersionsPerMajorVersion(options, matchingVersions, nodeVersions);
 	matchingVersions = matchingVersions.map(function (nodeVersion) {
 		return semver.clean(nodeVersion.version);
 	});
@@ -92,14 +88,12 @@ function getVersionMatch(versionOption, nodeVersions) {
 		throw new Error('Type of version should be a string or an object! Instead we got this: ' + versionOption);
 	}
 
-	if (versionMatch.version === LATEST_VERSION) {
-		versionMatch.version = semver.clean(nodeVersions[0].version);
-	}
+	versionMatch.version = versionMatch.version.replace(new RegExp(LATEST_VERSION, 'g'), semver.clean(nodeVersions[0].version));
 
 	return versionMatch;
 }
 
-function defaultVersionMatchingFunction(versionMatch) {
+function defaultVersionMatchingComparator(versionMatch) {
 	return function (nodeVersion) {
 		return semver.satisfies(nodeVersion.version, versionMatch.version) && versionDateMatches(nodeVersion, versionMatch);
 	};
@@ -123,6 +117,18 @@ function versionDateMatches(nodeVersion, versionMatch) {
 	}
 	
 	return dateMatches;
+}
+
+function filterMaximumNumberOfVersionsPerMajorVersion(options, matchingVersions, nodeVersions) {
+	for (var i = 0; i < matchingVersions.length; i++) {
+		var version = matchingVersions[i].version;
+		var equalMajorVersionCount = matchingVersions.reduce(function (currentCount, currentVersion) {
+			return currentCount + (semver.clean(currentVersion.version)[0] === semver.clean(version)[0]? 1 : 0);
+		}, 0);
+		if (equalMajorVersionCount > options.numberOfVersionsPerMajorNumber) {
+			matchingVersions.splice(i, equalMajorVersionCount - options.numberOfVersionsPerMajorNumber);
+		}
+	}
 }
 
 function getNewNodeVersions(options, previousVersions, newVersions) {

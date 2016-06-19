@@ -3,8 +3,13 @@ module.exports = function(grunt) {
 
 	grunt.initConfig({
 		updatetravis: {
-			all: ['Gruntfile.js', 'tasks/**/*.js']
+			options: {
+				version: '>=0.10.0',
+				replacePreviousVersions: true,
+				numberOfVersionPerMajorNumber: 3
+			}
 		}
 	});
 
+	grunt.registerTask('default', ['updatetravis']);
 };
